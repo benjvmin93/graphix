@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 class NeighborsNoiseModel(NoiseModel):
     """Neighbor noise model.
 
-    Tracks the neighbor nodes of each nodes using a state graph.
+    Tracks the entangled neighbors of each node using a state graph.
     Apply channels specified in `channel_selector`.
     The entries within `channel_selector` are CommandKind.
     """
@@ -32,7 +32,7 @@ class NeighborsNoiseModel(NoiseModel):
     ) -> None:
         self._state_graph: nx.Graph = (
             input_graph if input_graph is not None else nx.Graph()
-        )  # Global tracking of the neighbors (entanglement and position)
+        )  # Global tracking of the neighbors (entanglement)
         self.rng = ensure_rng(rng)
         self.channel_specifier = channel_specifier
 
