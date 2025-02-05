@@ -51,6 +51,7 @@ class NeighborsNoiseModel(NoiseModel):
             return noise
 
         neighbor_combinations = list(combinations(neighbors, channel.nqubit))  # Get all combinations of the neighbor nodes
+        # print(f"neighbor combinations = {neighbor_combinations}")
         noise.extend(
             [(channel, list(comb)) for comb in neighbor_combinations]
         )  # Update noise by adding the channel with each combination
@@ -68,8 +69,11 @@ class NeighborsNoiseModel(NoiseModel):
         according to its number of qubits.
         """
         self._state_graph.add_nodes_from(nodes)
-        channel = self.channel_specifier["input"]
+        channel = getattr(self.channel_specifier, "input", None)
         noise = Noise()
+
+        if channel == None:
+            return noise
         for n in nodes:  # ITerate through each nodes
             neighbors = list(self._state_graph.neighbors(n))
 
@@ -88,12 +92,24 @@ class NeighborsNoiseModel(NoiseModel):
         M: removes a node from the state graph.
         """
         kind = cmd.kind
-        channel = self.channel_specifier[kind]
+        # print(f"NEIHBORS NOISE MODEL:")
+        # print(f"{self.channel_specifier}")
+        # print(f"CMD: {cmd}")
+        # print(f"KIND: {cmd.kind}")
 
+
+        channel = self.channel_specifier.get(kind)        
+        
+        # print(f"Channel = {channel}")
+
+        
         if kind == CommandKind.N:
+            # print(f"===============================")
             self._state_graph.add_node(
                 cmd.node
             )  # Update state_graph. No need to check if the node already in the state graph because we can't prepare a node twice.
+            if channel == None:
+                return Noise()
             if channel.nqubit != 1:
                 warnings.warn(f"Krauss channel with {channel_nqubits} qubits can not be applied to 1 qubit.")
                 return Noise()
@@ -102,21 +118,29 @@ class NeighborsNoiseModel(NoiseModel):
 
         elif kind == CommandKind.E:
             self._state_graph.add_edge(cmd.nodes[0], cmd.nodes[1])
-            neighbors_first = self._state_graph.neighbors(cmd.nodes[0])
-            neighbors_second = self._state_graph.neighbors(cmd.nodes[1])
+            if channel == None:
+                return Noise()
+            neighbors_first = list(self._state_graph.neighbors(cmd.nodes[0]))
+            neighbors_second = list(self._state_graph.neighbors(cmd.nodes[1]))
 
             # Question: should we take into account that two nodes could have the same neighbors
             # Or only consider each neighbors once even if they are common neighbors of the two node to intricate?
             # For now, creates a set containing each neighbor once even if they are common to the two nodes to intricate.
             neighbors = set(neighbors_first + neighbors_second)
 
-            return self._noise_with_combinations(neighbors, channel)
+            # print(list(neighbors))
+            # print(f"===============================")
+            noise_with_combinations = self._noise_with_combinations(list(neighbors), channel)
+            # print(noise_with_combinations)
+            # return noise_with_combinations
 
         else:  # M, X, Z, C, T commands
             neighbors = self._state_graph.neighbors(cmd.node)
 
             if kind == CommandKind.M:
                 self._state_graph.remove_node(cmd.node)
+            if channel == None:
+                return Noise()
 
             return self._noise_with_combinations(neighbors, channel)
 
@@ -124,7 +148,4 @@ class NeighborsNoiseModel(NoiseModel):
 
     def confuse_result(self, result: bool) -> bool:
         """Assign wrong measurement result."""
-        if self.rng.uniform() < self.measure_error_prob:
-            return not result
-        else:
-            return result
+        return result
