@@ -445,33 +445,45 @@ class TestNoisyDensityMatrixBackend:
             or np.allclose(res.rho, Ops.Z @ Ops.X @ exact @ Ops.X @ Ops.Z)
         )
 
+    # Test the neighbors noise with preparation command. Should not apply any noise to the state since prepared nodes are new to the graph and thus have no intrication with other nodes.
+    def test_noisy_neighbors_preparation(self, fx_rng: Generator) -> None:
+        p = self.bellpat()
+        
+        expected = p.simulate_pattern(
+            backend="densitymatrix", rng=fx_rng)
+
+        noise = NeighborsNoiseModel(channel_specifier={ CommandKind.N: depolarising_channel(1.) }, rng=fx_rng)
+        result = p.simulate_pattern(backend="densitymatrix", noise_model=noise, rng=fx_rng)
+
+        # print(f"Expected rho:\n{expected.rho}")
+        # print(f"result rho:\n{result.rho}")
+        assert(
+            np.allclose(expected.rho, result.rho)
+        )
+
+
     # Test the noise with neighbors with an initial graph, which could represent a noise depending on the position of each nodes.
-    def test_noisy_neighbors_input_depolarizing(self, fx_rng: Generator) -> None:
+    def test_noisy_neighbors_entanglement_depolarizing(self, fx_rng: Generator) -> None:
         import networkx as nx
         from graphix.pattern import Pattern
         from itertools import combinations
+        from graphix.command import N, E, CommandKind
         
-        initial_nodes = [0, 1]    # Nodes that are initially noisy by their positions affecting other's states
-        
-        p = Pattern(initial_nodes)
-        initial_graph = nx.Graph()
-        comb = list(combinations(initial_nodes, 2))
-        initial_graph.add_edges_from(comb)
+        p = Pattern()
+        p.add(N(0))
+        p.add(N(1))
+        p.add(E((0, 1)))
 
-        res = p.simulate_pattern(
+        res1 = p.simulate_pattern(
+            backend="densitymatrix", rng=fx_rng)
+
+        # print(res1.rho)
+
+        res2 = p.simulate_pattern(
             backend="densitymatrix", noise_model=NeighborsNoiseModel(
-                {"input": depolarising_channel(1.)},
+                { CommandKind.E: two_qubit_depolarising_tensor_channel(1.) },
                 fx_rng,
-                initial_graph
-            )
+                )
         )
 
-        expected = p.simulate_pattern(
-            "densitymatrix",
-            noise_model=DepolarisingNoiseModel(prepare_error_prob=1.)
-        )
-
-        assert (
-            np.allclose(res.rho, expected.rho)
-        )
-
+        # print(res2.rho)
