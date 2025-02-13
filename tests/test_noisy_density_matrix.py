@@ -464,9 +464,6 @@ class TestNoisyDensityMatrixBackend:
 
     # Test the noise with neighbors with an initial graph, which could represent a noise depending on the position of each nodes.
     def test_noisy_neighbors_entanglement_depolarizing(self, fx_rng: Generator) -> None:
-        import networkx as nx
-        from graphix.pattern import Pattern
-        from itertools import combinations
         from graphix.command import N, E, CommandKind
         
         p = Pattern()
