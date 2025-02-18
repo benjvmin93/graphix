@@ -21,7 +21,7 @@ class EntanglementCrossTalkNoiseModel(NoiseModel):
 
     Tracks the entangled neighbors of each node using a state graph.
     Apply channels specified in `channel_selector`. Each channel must be a 1 qubit channel.
-    The entries within `channel_selector` are CommandKind.
+    The entries within `channel_selector` are CommandKind and the `input` literal.
     """
 
     def __init__(
@@ -50,9 +50,8 @@ class EntanglementCrossTalkNoiseModel(NoiseModel):
         compose the noise with the channel applied on each of these nodes.
         """
         self._state_graph.add_nodes_from(nodes)
-        channel = self.channel_specifier.get("input")
         noise = Noise()
-
+        channel = self.channel_specifier.get("input")
         if channel == None: # Channel is not specified in the channel_specifier
             return noise
 
@@ -82,17 +81,17 @@ class EntanglementCrossTalkNoiseModel(NoiseModel):
             return Noise()  # Return empty noise since we just prepared this node. Thus, it is not entangled with any other node.
 
         elif kind == CommandKind.E:
-            self._state_graph.add_edge(cmd.nodes[0], cmd.nodes[1])
+            self._state_graph.add_edge(cmd.nodes[0], cmd.nodes[1])  # Update entanglement state graph.
 
             neighbors_first = set(self._state_graph.neighbors(cmd.nodes[0]))
             neighbors_second = set(self._state_graph.neighbors(cmd.nodes[1]))
-            neighbors = list(neighbors_first + neighbors_second)
+            neighbors += list(neighbors_first | neighbors_second)   # Union of the sets turned into a list.
 
         else:  # M, X, Z, C, T commands
             neighbors = self._state_graph.neighbors(cmd.node)
 
             if kind == CommandKind.M:
-                self._state_graph.remove_node(cmd.node)
+                self._state_graph.remove_node(cmd.node) # Remove the node if measurement command.
 
         return Noise([(channel, neighb) for neighb in neighbors])
 

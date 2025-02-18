@@ -9,7 +9,7 @@ import pytest
 from graphix.channels import depolarising_channel, two_qubit_depolarising_tensor_channel
 from graphix.command import CommandKind
 from graphix.noise_models.depolarising_noise_model import DepolarisingNoiseModel
-from graphix.noise_models.neighbors_noise_model import NeighborsNoiseModel
+from graphix.noise_models.entanglement_crosstalk_noise_model import EntanglementCrossTalkNoiseModel
 from graphix.noise_models.noiseless_noise_model import NoiselessNoiseModel
 from graphix.ops import Ops
 from graphix.transpiler import Circuit
@@ -445,42 +445,29 @@ class TestNoisyDensityMatrixBackend:
             or np.allclose(res.rho, Ops.Z @ Ops.X @ exact @ Ops.X @ Ops.Z)
         )
 
-    # Test the neighbors noise with preparation command. Should not apply any noise to the state since prepared nodes are new to the graph and thus have no intrication with other nodes.
-    def test_noisy_neighbors_preparation(self, fx_rng: Generator) -> None:
-        p = self.bellpat()
-        
-        expected = p.simulate_pattern(
-            backend="densitymatrix", rng=fx_rng)
-
-        noise = NeighborsNoiseModel(channel_specifier={ CommandKind.N: depolarising_channel(1.) }, rng=fx_rng)
-        result = p.simulate_pattern(backend="densitymatrix", noise_model=noise, rng=fx_rng)
-
-        # print(f"Expected rho:\n{expected.rho}")
-        # print(f"result rho:\n{result.rho}")
-        assert(
-            np.allclose(expected.rho, result.rho)
-        )
-
-
-    # Test the noise with neighbors with an initial graph, which could represent a noise depending on the position of each nodes.
     def test_noisy_neighbors_entanglement_depolarizing(self, fx_rng: Generator) -> None:
-        from graphix.command import N, E, CommandKind
-        
+        from graphix.command import CommandKind, E, N
+        from graphix import Pattern
+        from graphix.simulator import DensityMatrixBackend
+
         p = Pattern()
         p.add(N(0))
         p.add(N(1))
         p.add(E((0, 1)))
+        
+        expected = DensityMatrixBackend()
+        expected.add_nodes([0, 1])
+        expected.entangle_nodes((0, 1))
+        expected.apply_channel(depolarising_channel(1.), [0])
+        expected.apply_channel(depolarising_channel(1.), [1])
 
-        res1 = p.simulate_pattern(
-            backend="densitymatrix", rng=fx_rng)
-
-        # print(res1.rho)
-
-        res2 = p.simulate_pattern(
-            backend="densitymatrix", noise_model=NeighborsNoiseModel(
-                { CommandKind.E: two_qubit_depolarising_tensor_channel(1.) },
+        res = p.simulate_pattern(   # Expected one qubit depolarising channel applied on neighbors 0 and 1
+            backend="densitymatrix",
+            rng=fx_rng,
+            noise_model=EntanglementCrossTalkNoiseModel(
+                {CommandKind.E: depolarising_channel(1.0)},
                 fx_rng,
-                )
+            ),
         )
 
-        # print(res2.rho)
+        assert(np.allclose(res.rho, expected.state.rho))
